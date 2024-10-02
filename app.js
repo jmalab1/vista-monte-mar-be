@@ -29,7 +29,7 @@ app.post("/api/send-email", (req, res) => {
   const { subject, text } = req.body;
 
   let mailOptions = {
-    from: "jmalab24@gmail.com", // Replace with your email
+    from: "jayson.malabanan@gmail.com", // Replace with your email
     to: "malabanan1@verizon.net",
     subject: subject,
     text: text,
