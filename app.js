@@ -1,0 +1,49 @@
+const express = require("express");
+const nodemailer = require("nodemailer");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+
+const app = express();
+const PORT = 8135;
+
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+
+console.log(process.env.SMTP_USER);
+console.log(process.env.SMTP_PASS);
+
+// Create a Nodemailer transporter
+let transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com", // Replace with your SMTP server
+  port: 587,
+  secure: false, // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER, // your SMTP username
+    pass: process.env.SMTP_PASS, // your SMTP password
+  },
+});
+
+// Email sending endpoint
+app.post("/api/send-email", (req, res) => {
+  const { subject, text } = req.body;
+
+  let mailOptions = {
+    from: "jmalab24@gmail.com", // Replace with your email
+    to: "malabanan1@verizon.net",
+    subject: subject,
+    text: text,
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      return res.status(500).send({ error: error.toString() });
+    }
+    res.status(200).send({ message: "Email sent successfully!", info });
+  });
+});
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
