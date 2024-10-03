@@ -2,6 +2,7 @@ const express = require("express");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
 const bodyParser = require("body-parser");
+const morgan = require('morgan');
 
 const app = express();
 const PORT = 8135;
@@ -10,8 +11,8 @@ const PORT = 8135;
 app.use(cors());
 app.use(bodyParser.json());
 
-console.log(process.env.SMTP_USER);
-console.log(process.env.SMTP_PASS);
+// Middleware for logging requests
+app.use(morgan('combined')); // Use 'combined' format for logging
 
 // Create a Nodemailer transporter
 let transporter = nodemailer.createTransport({
@@ -43,7 +44,6 @@ app.post("/api/send-email", (req, res) => {
   });
 });
 
-// Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
