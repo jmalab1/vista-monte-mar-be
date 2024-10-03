@@ -27,13 +27,26 @@ let transporter = nodemailer.createTransport({
 
 // Email sending endpoint
 app.post("/api/send-email", (req, res) => {
-  const { subject, text } = req.body;
+  const { firstname, lastname, email, phone_number, comment } = req.body;
+  const fullname = `${firstname} ${lastname}`.trim();
+
+  const htmlBody = `
+    <html>
+      <body>
+        <h1>Hello!</h1>
+        <p>You have received a comment from ${fullname}.</p>
+        <p>Email: ${email}</p>
+        <p>Phone Number: ${phone_number}</p>
+        <p>Comment: ${comment}</p>
+      </body>
+    </html>
+  `;
 
   let mailOptions = {
     from: process.env.SMTP_USER, // Replace with your email
-    to: "malabanan1@verizon.net",
-    subject: subject,
-    text: text,
+    to: "jmalabanan@casajadecr.com",
+    subject: `Message from ${fullname}`,
+    html: htmlBody,
   };
 
   transporter.sendMail(mailOptions, (error, info) => {
