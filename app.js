@@ -15,7 +15,7 @@ console.log(process.env.SMTP_PASS);
 
 // Create a Nodemailer transporter
 let transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com", // Replace with your SMTP server
+  host: "smtp.zoho.com", // Replace with your SMTP server
   port: 587,
   secure: false, // true for 465, false for other ports
   auth: {
@@ -29,7 +29,7 @@ app.post("/api/send-email", (req, res) => {
   const { subject, text } = req.body;
 
   let mailOptions = {
-    from: "jayson.malabanan@gmail.com", // Replace with your email
+    from: process.env.SMTP_USER, // Replace with your email
     to: "malabanan1@verizon.net",
     subject: subject,
     text: text,
