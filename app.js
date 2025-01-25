@@ -3,13 +3,23 @@ const nodemailer = require("nodemailer");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = 8135;
 
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 3, // Limit each IP to 100 requests per `window` (here, per 15 minutes).
+  standardHeaders: 'draft-8', // draft-6: `RateLimit-*` headers; draft-7 & draft-8: combined `RateLimit` header
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers.
+  messsage: "The limit to sending a message has been reached. Please Try again later."
+});
+
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(limiter);
 
 // Middleware for logging requests
 app.use(morgan('combined')); // Use 'combined' format for logging
@@ -44,7 +54,7 @@ app.post("/api/send-email", (req, res) => {
 
   let mailOptions = {
     from: process.env.SMTP_USER, // Replace with your email
-    to: "jmalabanan@casajadecr.com",
+    to: process.env.SEND_TO,
     subject: `Message from ${fullname}`,
     html: htmlBody,
   };
