@@ -41,7 +41,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/vista-monte-mar-app
+          images: ${{ secrets.DOCKER_USERNAME }}/vista-monte-mar-be
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
