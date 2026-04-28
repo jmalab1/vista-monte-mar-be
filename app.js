@@ -293,6 +293,43 @@ function normalizeTrackedPath(pathValue) {
   return `/${path}`;
 }
 
+function deriveTrackedPathFromRequest(req) {
+  const explicitPath = String(req.headers["x-page-path"] || req.body?.path || "").trim();
+  if (explicitPath) {
+    return normalizeTrackedPath(explicitPath);
+  }
+
+  const referer = String(req.headers.referer || req.headers.referrer || "").trim();
+  if (!referer) {
+    return "/";
+  }
+
+  try {
+    const parsed = new URL(referer);
+    return normalizeTrackedPath(parsed.pathname || "/");
+  } catch {
+    return "/";
+  }
+}
+
+async function saveVisitorEvent(req, trackedPathOverride) {
+  const trackedPath = normalizeTrackedPath(trackedPathOverride || deriveTrackedPathFromRequest(req));
+  const referrer = String(req.headers.referer || req.headers.referrer || req.body?.referrer || "").trim();
+  const userAgent = String(req.headers["user-agent"] || "").trim();
+  const ipAddress = getClientIp(req);
+
+  const result = await dbPool.query(
+    `
+      INSERT INTO visitors (path, referrer, user_agent, ip)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id;
+    `,
+    [trackedPath, referrer || null, userAgent || null, ipAddress || null]
+  );
+
+  return result.rows[0].id;
+}
+
 const hasSmtpConfig = Boolean(
   process.env.SMTP_USER && process.env.SMTP_PASS && process.env.SEND_TO
 );
@@ -422,31 +459,61 @@ app.post("/api/save-checklist", requireAuth, async (req, res) => {
   }
 });
 
-app.post("/api/track-visitor", async (req, res) => {
-  const trackedPath = normalizeTrackedPath(
-    req.body?.path || req.headers["x-page-path"] || "/"
-  );
-  const referrer = String(
-    req.body?.referrer || req.headers.referer || req.headers.referrer || ""
-  ).trim();
-  const userAgent = String(req.headers["user-agent"] || "").trim();
-  const ipAddress = getClientIp(req);
+app.use("/api", async (req, _res, next) => {
+  const method = String(req.method || "").toUpperCase();
+  const routePath = String(req.path || "");
 
+  const shouldTrackMethod = method === "GET";
+  const excludedPaths = new Set([
+    "/login",
+    "/verify-token",
+    "/track-visitor",
+    "/visitor-history",
+  ]);
+
+  if (!shouldTrackMethod || excludedPaths.has(routePath)) {
+    return next();
+  }
+
+  try {
+    await saveVisitorEvent(req);
+  } catch (error) {
+    console.error("Failed to auto-track visitor:", error);
+  }
+
+  return next();
+});
+
+app.get("/api/visitor-history", requireAuth, async (_req, res) => {
   try {
     const result = await dbPool.query(
       `
-        INSERT INTO visitors (path, referrer, user_agent, ip)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id;
-      `,
-      [trackedPath, referrer || null, userAgent || null, ipAddress || null]
+        SELECT created_at, path, referrer, user_agent, ip
+        FROM visitors
+        ORDER BY created_at DESC
+        LIMIT 500;
+      `
     );
 
-    return res.status(201).send({ tracked: true, visitorId: result.rows[0].id });
-  } catch (dbError) {
-    console.error("Failed to save visitor:", dbError);
-    return res.status(500).send({ tracked: false, error: "Unable to save visitor." });
+    const rows = result.rows.map((row) => ({
+      createdAt: row.created_at,
+      path: row.path,
+      referrer: row.referrer,
+      userAgent: row.user_agent,
+      ip: row.ip,
+    }));
+
+    return res.status(200).send(rows);
+  } catch (error) {
+    console.error("Failed to load visitor history:", error);
+    return res.status(500).send({ error: "Unable to load visitor history." });
   }
+});
+
+app.post("/api/track-visitor", (_req, res) => {
+  return res.status(410).send({
+    message: "Deprecated: tracking is now server-side and stored in Postgres.",
+  });
 });
 
 app.post("/api/send-email", emailLimiter, async (req, res) => {
