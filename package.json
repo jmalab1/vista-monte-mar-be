@@ -4,7 +4,7 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run --globals --no-file-parallelism --cache=false",
     "start": "node app.js"
   },
   "author": "",
@@ -17,5 +17,9 @@
     "morgan": "^1.10.0",
     "nodemailer": "^6.9.15",
     "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2",
+    "vitest": "^2.1.9"
   }
 }

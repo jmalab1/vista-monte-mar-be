@@ -1,0 +1,15 @@
+module.exports = {
+  PORT: Number(process.env.PORT || 8135),
+  TOKEN_TTL_SECONDS: Number(process.env.TOKEN_TTL_SECONDS || 60 * 60 * 12),
+  AUTH_SECRET: process.env.AUTH_SECRET || 'change-this-local-auth-secret',
+  ADMIN_USERNAME: process.env.ADMIN_USERNAME || 'admin',
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'admin123',
+  DB_HOST: process.env.DB_HOST || 'localhost',
+  DB_PORT: Number(process.env.DB_PORT || 5432),
+  DB_NAME: process.env.DB_NAME || 'visitor_analytics',
+  DB_USER: process.env.DB_USER || 'visitor_user',
+  DB_PASSWORD: process.env.DB_PASSWORD || 'change-me',
+  SMTP_USER: process.env.SMTP_USER || '',
+  SMTP_PASS: process.env.SMTP_PASS || '',
+  SEND_TO: process.env.SEND_TO || '',
+};
