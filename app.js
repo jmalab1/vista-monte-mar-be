@@ -150,6 +150,21 @@ function requireAuth(req, res, next) {
   return next();
 }
 
+function requireAdmin(req, res, next) {
+  const token = getTokenFromRequest(req);
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    return res.status(401).send({ error: "Unauthorized" });
+  }
+
+  if (String(decoded.sub || "") !== ADMIN_USERNAME) {
+    return res.status(403).send({ error: "Forbidden" });
+  }
+
+  req.auth = decoded;
+  return next();
+}
+
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -365,7 +380,7 @@ app.get("/api/verify-token", (req, res) => {
   return res.status(200).send({ valid: true, user: decoded.sub, exp: decoded.exp });
 });
 
-app.get("/api/inventory-listing", requireAuth, async (_req, res) => {
+app.get("/api/inventory-listing", requireAdmin, async (_req, res) => {
   try {
     const listing = await getJsonValue("inventory_listing", DEFAULT_INVENTORY_LISTING);
     return res.status(200).send(listing);
@@ -374,7 +389,7 @@ app.get("/api/inventory-listing", requireAuth, async (_req, res) => {
   }
 });
 
-app.post("/api/update-inventory-listing", requireAuth, async (req, res) => {
+app.post("/api/update-inventory-listing", requireAdmin, async (req, res) => {
   if (!isPlainObject(req.body)) {
     return res.status(400).send({ error: "Inventory listing must be a JSON object." });
   }
@@ -389,7 +404,7 @@ app.post("/api/update-inventory-listing", requireAuth, async (req, res) => {
   }
 });
 
-app.get("/api/get-inventory", requireAuth, async (_req, res) => {
+app.get("/api/get-inventory", requireAdmin, async (_req, res) => {
   try {
     const listing = await getJsonValue("inventory_listing", DEFAULT_INVENTORY_LISTING);
     const fallback = getInventoryDefaults(listing);
@@ -400,7 +415,7 @@ app.get("/api/get-inventory", requireAuth, async (_req, res) => {
   }
 });
 
-app.post("/api/save-inventory", requireAuth, async (req, res) => {
+app.post("/api/save-inventory", requireAdmin, async (req, res) => {
   if (!isPlainObject(req.body)) {
     return res.status(400).send({ error: "Inventory payload must be a JSON object." });
   }
@@ -412,7 +427,7 @@ app.post("/api/save-inventory", requireAuth, async (req, res) => {
   }
 });
 
-app.get("/api/checklist-listing", requireAuth, async (_req, res) => {
+app.get("/api/checklist-listing", requireAdmin, async (_req, res) => {
   try {
     const listing = await getJsonValue("checklist_listing", DEFAULT_CHECKLIST_LISTING);
     return res.status(200).send(listing);
@@ -421,7 +436,7 @@ app.get("/api/checklist-listing", requireAuth, async (_req, res) => {
   }
 });
 
-app.post("/api/update-checklist-listing", requireAuth, async (req, res) => {
+app.post("/api/update-checklist-listing", requireAdmin, async (req, res) => {
   if (!isPlainObject(req.body)) {
     return res.status(400).send({ error: "Checklist listing must be a JSON object." });
   }
@@ -436,7 +451,7 @@ app.post("/api/update-checklist-listing", requireAuth, async (req, res) => {
   }
 });
 
-app.get("/api/get-checklist", requireAuth, async (_req, res) => {
+app.get("/api/get-checklist", requireAdmin, async (_req, res) => {
   try {
     const listing = await getJsonValue("checklist_listing", DEFAULT_CHECKLIST_LISTING);
     const fallback = getChecklistDefaults(listing);
@@ -447,7 +462,7 @@ app.get("/api/get-checklist", requireAuth, async (_req, res) => {
   }
 });
 
-app.post("/api/save-checklist", requireAuth, async (req, res) => {
+app.post("/api/save-checklist", requireAdmin, async (req, res) => {
   if (!isPlainObject(req.body)) {
     return res.status(400).send({ error: "Checklist payload must be a JSON object." });
   }
@@ -484,7 +499,7 @@ app.use("/api", async (req, _res, next) => {
   return next();
 });
 
-app.get("/api/visitor-history", requireAuth, async (_req, res) => {
+app.get("/api/visitor-history", requireAdmin, async (_req, res) => {
   try {
     const result = await dbPool.query(
       `
