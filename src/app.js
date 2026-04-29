@@ -6,6 +6,7 @@ const authRoutes = require('./routes/authRoutes');
 const visitorRoutes = require('./routes/visitorRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
 const checklistRoutes = require('./routes/checklistRoutes');
+const { preferencesRoutes } = require('./routes/preferencesRoutes');
 const { createContactRouter } = require('./routes/contactRoutes');
 const { visitorTracking } = require('./middleware/visitorTracking');
 
@@ -19,6 +20,7 @@ function createApp(options = {}) {
   app.use(visitorRoutes);
   app.use(inventoryRoutes);
   app.use(checklistRoutes);
+  app.use(preferencesRoutes);
   app.use(createContactRouter(options.contactRouteOverrides));
   return app;
 }
