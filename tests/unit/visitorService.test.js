@@ -4,7 +4,7 @@ const {
   deriveTrackedPathFromRequest,
   getClientIp,
   saveVisitorEvent,
-  getVisitorHistory,
+  getVisitorHistoryPage,
 } = require('../../src/services/visitorService');
 
 describe('visitorService', () => {
@@ -77,22 +77,27 @@ describe('visitorService', () => {
     expect(dbPool.query.mock.calls[0][1]).toEqual(['/page', 'https://example.com/path', 'agent', '7.7.7.7']);
   });
 
-  it('maps visitor history response to existing shape', async () => {
-    dbPool.query.mockResolvedValueOnce({
-      rows: [
-        {
-          created_at: '2026-04-28T12:00:00.000Z',
-          path: '/x',
-          referrer: 'r',
-          user_agent: 'ua',
-          ip: '1.1.1.1',
-        },
-      ],
-    });
+  it('returns paginated history payload with series', async () => {
+    dbPool.query
+      .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            created_at: '2026-04-28T12:00:00.000Z',
+            path: '/x',
+            referrer: 'r',
+            user_agent: 'ua',
+            ip: '1.1.1.1',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ bucket: '2026-04-28', count: 1 }],
+      });
 
-    const rows = await getVisitorHistory();
+    const payload = await getVisitorHistoryPage({ page: 1, pageSize: 25, period: 'day' });
 
-    expect(rows).toEqual([
+    expect(payload.records).toEqual([
       {
         createdAt: '2026-04-28T12:00:00.000Z',
         path: '/x',
@@ -101,5 +106,11 @@ describe('visitorService', () => {
         ip: '1.1.1.1',
       },
     ]);
+    expect(payload.total).toBe(1);
+    expect(payload.page).toBe(1);
+    expect(payload.pageSize).toBe(25);
+    expect(payload.totalPages).toBe(1);
+    expect(payload.period).toBe('day');
+    expect(payload.series).toEqual([{ bucket: '2026-04-28', count: 1 }]);
   });
 });

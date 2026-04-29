@@ -52,24 +52,78 @@ async function saveVisitorEvent(req, trackedPathOverride) {
   return result.rows[0].id;
 }
 
-async function getVisitorHistory(limit = 500) {
-  const result = await dbPool.query(
+function normalizePaginationValue(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return Math.floor(parsed);
+}
+
+function normalizePeriod(period) {
+  if (period === 'month' || period === 'year') {
+    return period;
+  }
+  return 'day';
+}
+
+async function getVisitorHistoryPage({ page = 1, pageSize = 25, period = 'day' } = {}) {
+  const safePage = normalizePaginationValue(page, 1);
+  const safePageSize = Math.min(normalizePaginationValue(pageSize, 25), 100);
+  const safePeriod = normalizePeriod(period);
+  const offset = (safePage - 1) * safePageSize;
+
+  const [totalResult, recordsResult] = await Promise.all([
+    dbPool.query('SELECT COUNT(*)::int AS total FROM visitors;'),
+    dbPool.query(
+      `
+        SELECT created_at, path, referrer, user_agent, ip
+        FROM visitors
+        ORDER BY created_at DESC
+        OFFSET $1
+        LIMIT $2;
+      `,
+      [offset, safePageSize]
+    ),
+  ]);
+
+  const total = totalResult.rows[0]?.total || 0;
+  const totalPages = Math.max(Math.ceil(total / safePageSize), 1);
+
+  const truncExpr =
+    safePeriod === 'year'
+      ? "to_char(date_trunc('year', created_at), 'YYYY')"
+      : safePeriod === 'month'
+        ? "to_char(date_trunc('month', created_at), 'YYYY-MM')"
+        : "to_char(date_trunc('day', created_at), 'YYYY-MM-DD')";
+
+  const seriesResult = await dbPool.query(
     `
-      SELECT created_at, path, referrer, user_agent, ip
+      SELECT ${truncExpr} AS bucket, COUNT(*)::int AS count
       FROM visitors
-      ORDER BY created_at DESC
-      LIMIT $1;
-    `,
-    [limit]
+      GROUP BY bucket
+      ORDER BY bucket ASC;
+    `
   );
 
-  return result.rows.map((row) => ({
-    createdAt: row.created_at,
-    path: row.path,
-    referrer: row.referrer,
-    userAgent: row.user_agent,
-    ip: row.ip,
-  }));
+  return {
+    records: recordsResult.rows.map((row) => ({
+      createdAt: row.created_at,
+      path: row.path,
+      referrer: row.referrer,
+      userAgent: row.user_agent,
+      ip: row.ip,
+    })),
+    total,
+    page: safePage,
+    pageSize: safePageSize,
+    totalPages,
+    period: safePeriod,
+    series: seriesResult.rows.map((row) => ({
+      bucket: row.bucket,
+      count: row.count,
+    })),
+  };
 }
 
 module.exports = {
@@ -77,5 +131,5 @@ module.exports = {
   deriveTrackedPathFromRequest,
   getClientIp,
   saveVisitorEvent,
-  getVisitorHistory,
+  getVisitorHistoryPage,
 };
