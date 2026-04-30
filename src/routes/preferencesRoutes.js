@@ -1,6 +1,8 @@
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
 const { getJsonValue, setJsonValue } = require('../services/kvService');
+const { logAuditEvent } = require('../services/auditService');
+const { getClientIp } = require('../services/visitorService');
 
 const router = express.Router();
 
@@ -48,6 +50,13 @@ router.put('/api/admin-preferences', requireAuth, async (req, res) => {
     const current = await getJsonValue(key, DEFAULT_PREFERENCES);
     const merged = sanitizePreferences({ ...current, ...(req.body || {}) });
     await setJsonValue(key, merged);
+    await logAuditEvent({
+      actor: userKey,
+      action: 'admin_preferences_updated',
+      target: key,
+      metadata: { updates: req.body || {} },
+      ip: getClientIp(req),
+    });
     return res.status(200).send(merged);
   } catch (error) {
     console.error('Failed to save admin preferences:', error);

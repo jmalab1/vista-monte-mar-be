@@ -67,23 +67,63 @@ function normalizePeriod(period) {
   return 'day';
 }
 
-async function getVisitorHistoryPage({ page = 1, pageSize = 25, period = 'day' } = {}) {
+async function getVisitorHistoryPage({
+  page = 1,
+  pageSize = 25,
+  period = 'day',
+  path,
+  referrer,
+  ip,
+  from,
+  to,
+  uaContains,
+} = {}) {
   const safePage = normalizePaginationValue(page, 1);
   const safePageSize = Math.min(normalizePaginationValue(pageSize, 25), 100);
   const safePeriod = normalizePeriod(period);
   const offset = (safePage - 1) * safePageSize;
 
+  const where = [];
+  const params = [];
+  let paramIdx = 1;
+  if (path) {
+    where.push(`path = $${paramIdx++}`);
+    params.push(String(path));
+  }
+  if (referrer) {
+    where.push(`referrer ILIKE $${paramIdx++}`);
+    params.push(`%${String(referrer)}%`);
+  }
+  if (ip) {
+    where.push(`ip = $${paramIdx++}`);
+    params.push(String(ip));
+  }
+  if (from) {
+    where.push(`created_at >= $${paramIdx++}::timestamptz`);
+    params.push(String(from));
+  }
+  if (to) {
+    where.push(`created_at <= $${paramIdx++}::timestamptz`);
+    params.push(String(to));
+  }
+  if (uaContains) {
+    where.push(`user_agent ILIKE $${paramIdx++}`);
+    params.push(`%${String(uaContains)}%`);
+  }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
   const [totalResult, recordsResult] = await Promise.all([
-    dbPool.query('SELECT COUNT(*)::int AS total FROM visitors;'),
+    dbPool.query(`SELECT COUNT(*)::int AS total FROM visitors ${whereSql};`, params),
     dbPool.query(
       `
         SELECT created_at, path, referrer, user_agent, ip
         FROM visitors
+        ${whereSql}
         ORDER BY created_at DESC
-        OFFSET $1
-        LIMIT $2;
+        OFFSET $${paramIdx}
+        LIMIT $${paramIdx + 1};
       `,
-      [offset, safePageSize]
+      [...params, offset, safePageSize]
     ),
   ]);
 
@@ -101,9 +141,11 @@ async function getVisitorHistoryPage({ page = 1, pageSize = 25, period = 'day' }
     `
       SELECT ${truncExpr} AS bucket, COUNT(*)::int AS count
       FROM visitors
+      ${whereSql}
       GROUP BY bucket
       ORDER BY bucket ASC;
-    `
+    `,
+    params
   );
 
   return {
@@ -126,10 +168,21 @@ async function getVisitorHistoryPage({ page = 1, pageSize = 25, period = 'day' }
   };
 }
 
+async function getVisitorHistoryCsvRows(filters = {}) {
+  const payload = await getVisitorHistoryPage({
+    ...filters,
+    page: 1,
+    pageSize: 10000,
+    period: 'day',
+  });
+  return payload.records;
+}
+
 module.exports = {
   normalizeTrackedPath,
   deriveTrackedPathFromRequest,
   getClientIp,
   saveVisitorEvent,
   getVisitorHistoryPage,
+  getVisitorHistoryCsvRows,
 };

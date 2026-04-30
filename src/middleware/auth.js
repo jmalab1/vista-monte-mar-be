@@ -1,4 +1,5 @@
 const { verifyToken } = require('../lib/token');
+const { isTokenRevoked } = require('../services/securityService');
 
 function getTokenFromRequest(req) {
   const headerToken = req.headers['x-access-token'];
@@ -16,6 +17,7 @@ function requireAuth(req, res, next) {
   const token = getTokenFromRequest(req);
   const decoded = verifyToken(token);
   if (!decoded) return res.status(401).send({ error: 'Unauthorized' });
+  if (isTokenRevoked(decoded)) return res.status(401).send({ error: 'Session revoked' });
   req.auth = decoded;
   return next();
 }
