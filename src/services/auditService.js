@@ -65,6 +65,9 @@ async function getAuditEvents({
   pageSize = 25,
   action,
   actor,
+  target,
+  ip,
+  metadataContains,
   from,
   to,
 } = {}) {
@@ -82,6 +85,18 @@ async function getAuditEvents({
   if (actor) {
     where.push(`actor = $${idx++}`);
     params.push(String(actor));
+  }
+  if (target) {
+    where.push(`target = $${idx++}`);
+    params.push(String(target));
+  }
+  if (ip) {
+    where.push(`ip = $${idx++}`);
+    params.push(String(ip));
+  }
+  if (metadataContains) {
+    where.push(`metadata::text ILIKE $${idx++}`);
+    params.push(`%${String(metadataContains)}%`);
   }
   if (from) {
     where.push(`created_at >= $${idx++}::timestamptz`);

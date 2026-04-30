@@ -11,6 +11,9 @@ router.get('/api/audit-events', requireAuth, async (req, res) => {
       pageSize: req.query.pageSize ?? req.query.limit,
       action: req.query.action,
       actor: req.query.actor,
+      target: req.query.target,
+      ip: req.query.ip,
+      metadataContains: req.query.metadataContains,
       from: req.query.from,
       to: req.query.to,
     });
