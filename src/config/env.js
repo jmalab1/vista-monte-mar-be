@@ -1,6 +1,6 @@
 module.exports = {
   PORT: Number(process.env.PORT || 8135),
-  TOKEN_TTL_SECONDS: Number(process.env.TOKEN_TTL_SECONDS || 60 * 60 * 12),
+  TOKEN_TTL_SECONDS: Number(process.env.TOKEN_TTL_SECONDS || 60 * 20),
   AUTH_SECRET: process.env.AUTH_SECRET || 'change-this-local-auth-secret',
   ADMIN_USERNAME: process.env.ADMIN_USERNAME || 'admin',
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'admin123',

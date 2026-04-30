@@ -22,7 +22,7 @@ describe('auth routes', () => {
     expect(res.body).toEqual({ error: 'Invalid credentials' });
   });
 
-  it('verifies valid token', async () => {
+  it('verifies valid token and refreshes expiration', async () => {
     const app = createApp();
     const loginRes = await request(app)
       .post('/api/login')
@@ -36,6 +36,7 @@ describe('auth routes', () => {
     expect(res.body.valid).toBe(true);
     expect(res.body.user).toBe('admin');
     expect(typeof res.body.exp).toBe('number');
+    expect(typeof res.body.token).toBe('string');
   });
 
   it('rejects missing token on verification', async () => {
