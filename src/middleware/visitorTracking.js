@@ -5,6 +5,8 @@ const excludedPaths = new Set([
   '/verify-token',
   '/track-visitor',
   '/visitor-history',
+  '/contact-email-history',
+  '/contact-email-history/export.csv',
 ]);
 
 async function visitorTracking(req, _res, next) {

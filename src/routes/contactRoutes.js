@@ -1,5 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const { requireAuth } = require('../middleware/auth');
 const { hasSmtpConfig, sendContactEmail } = require('../services/mailService');
 const {
   normalizeBody,
@@ -8,6 +9,8 @@ const {
   createSubmission,
   markEmailSent,
   markEmailFailed,
+  getContactEmailHistoryPage,
+  getContactEmailHistoryCsvRows,
 } = require('../services/submissionService');
 
 const emailLimiter = rateLimit({
@@ -29,8 +32,19 @@ function createContactRouter(overrides = {}) {
   const sendEmail = overrides.sendContactEmail || sendContactEmail;
   const updateEmailSent = overrides.markEmailSent || markEmailSent;
   const updateEmailFailed = overrides.markEmailFailed || markEmailFailed;
+  const loadEmailHistory = overrides.getContactEmailHistoryPage || getContactEmailHistoryPage;
+  const loadEmailHistoryCsvRows =
+    overrides.getContactEmailHistoryCsvRows || getContactEmailHistoryCsvRows;
   const smtpConfigured =
     typeof overrides.hasSmtpConfig === 'boolean' ? overrides.hasSmtpConfig : hasSmtpConfig;
+
+  const escapeCsv = (value) => {
+    const text = String(value ?? '');
+    if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+    return text;
+  };
 
   router.post('/api/send-email', limiter, async (req, res) => {
     const payload = normalize(req.body || {});
@@ -69,6 +83,49 @@ function createContactRouter(overrides = {}) {
         submissionId,
         details: String(mailError),
       });
+    }
+  });
+
+  router.get('/api/contact-email-history', requireAuth, async (req, res) => {
+    try {
+      const payload = await loadEmailHistory({
+        page: req.query.page,
+        pageSize: req.query.pageSize,
+        limit: req.query.limit,
+        email: req.query.email,
+      });
+      return res.status(200).send(payload);
+    } catch (error) {
+      console.error('Failed to load contact email history:', error);
+      return res.status(500).send({ error: 'Unable to load email history.' });
+    }
+  });
+
+  router.get('/api/contact-email-history/export.csv', requireAuth, async (req, res) => {
+    try {
+      const rows = await loadEmailHistoryCsvRows({
+        email: req.query.email,
+      });
+      const header = 'createdAt,firstname,lastname,email,phone_number,comment,emailSent,emailError';
+      const lines = rows.map((row) =>
+        [
+          escapeCsv(row.createdAt),
+          escapeCsv(row.firstname),
+          escapeCsv(row.lastname),
+          escapeCsv(row.email),
+          escapeCsv(row.phone_number),
+          escapeCsv(row.comment),
+          escapeCsv(row.emailSent),
+          escapeCsv(row.emailError),
+        ].join(',')
+      );
+      const csv = [header, ...lines].join('\n');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="contact-email-history.csv"');
+      return res.status(200).send(csv);
+    } catch (error) {
+      console.error('Failed to export contact email history:', error);
+      return res.status(500).send({ error: 'Unable to export email history.' });
     }
   });
 

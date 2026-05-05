@@ -1,8 +1,14 @@
 const request = require('supertest');
 const rateLimit = require('express-rate-limit');
+const { dbPool } = require('../../src/services/database');
+const { createToken } = require('../../src/lib/token');
 const { createApp } = require('../helpers/testAppFactory');
 
 describe('contact route validation and response semantics', () => {
+  beforeEach(() => {
+    dbPool.query = vi.fn();
+  });
+
   function createTestApp(overrides = {}) {
     const contactRouteOverrides = {
       emailLimiter: (_req, _res, next) => next(),
@@ -16,6 +22,92 @@ describe('contact route validation and response semantics', () => {
 
     return createApp({ contactRouteOverrides });
   }
+
+  it('keeps contact email history auth-protected', async () => {
+    const app = createTestApp();
+
+    const res = await request(app).get('/api/contact-email-history');
+
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: 'Unauthorized' });
+  });
+
+  it('returns contact email history with paginated response shape', async () => {
+    dbPool.query
+      .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '42',
+            firstname: 'Jane',
+            lastname: 'Doe',
+            email: 'jane@example.com',
+            phone_number: '555-111-2222',
+            comment: 'Hello there',
+            email_sent: true,
+            email_error: null,
+            created_at: '2026-04-28T12:00:00.000Z',
+          },
+        ],
+      });
+
+    const app = createTestApp();
+    const token = createToken('admin');
+    const res = await request(app)
+      .get('/api/contact-email-history?page=1&pageSize=10&email=jane')
+      .set('x-access-token', token);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      records: [
+        {
+          id: '42',
+          firstname: 'Jane',
+          lastname: 'Doe',
+          email: 'jane@example.com',
+          phone_number: '555-111-2222',
+          comment: 'Hello there',
+          emailSent: true,
+          emailError: null,
+          createdAt: '2026-04-28T12:00:00.000Z',
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+      limit: 10,
+      totalPages: 1,
+    });
+  });
+
+  it('exports contact email history as csv', async () => {
+    dbPool.query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: '42',
+          firstname: 'Jane',
+          lastname: 'Doe',
+          email: 'jane@example.com',
+          phone_number: '555-111-2222',
+          comment: 'Hello, "there"',
+          email_sent: true,
+          email_error: null,
+          created_at: '2026-04-28T12:00:00.000Z',
+        },
+      ],
+    });
+
+    const app = createTestApp();
+    const token = createToken('admin');
+    const res = await request(app)
+      .get('/api/contact-email-history/export.csv?email=jane')
+      .set('x-access-token', token);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/csv');
+    expect(res.text).toContain('createdAt,firstname,lastname,email,phone_number,comment,emailSent,emailError');
+    expect(res.text).toContain('2026-04-28T12:00:00.000Z,Jane,Doe,jane@example.com,555-111-2222,"Hello, ""there""",true,');
+  });
 
   it('returns 400 when required fields are missing', async () => {
     const app = createTestApp();

@@ -68,6 +68,94 @@ async function markEmailFailed(submissionId, error) {
   );
 }
 
+function normalizePaginationValue(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return Math.floor(parsed);
+}
+
+function mapSubmissionRow(row) {
+  return {
+    id: row.id,
+    firstname: row.firstname,
+    lastname: row.lastname,
+    email: row.email,
+    phone_number: row.phone_number,
+    comment: row.comment,
+    emailSent: row.email_sent,
+    emailError: row.email_error,
+    createdAt: row.created_at,
+  };
+}
+
+function buildSubmissionHistoryWhere({ email } = {}) {
+  const where = [];
+  const params = [];
+
+  if (email) {
+    where.push('email ILIKE $1');
+    params.push(`%${String(email)}%`);
+  }
+
+  return {
+    whereSql: where.length ? `WHERE ${where.join(' AND ')}` : '',
+    params,
+  };
+}
+
+async function getContactEmailHistoryPage({ page = 1, pageSize, limit, email } = {}) {
+  const safePage = normalizePaginationValue(page, 1);
+  const requestedPageSize = pageSize ?? limit ?? 10;
+  const safePageSize = Math.min(normalizePaginationValue(requestedPageSize, 10), 100);
+  const offset = (safePage - 1) * safePageSize;
+  const { whereSql, params } = buildSubmissionHistoryWhere({ email });
+  const nextParam = params.length + 1;
+
+  const [totalResult, recordsResult] = await Promise.all([
+    dbPool.query(`SELECT COUNT(*)::int AS total FROM form_submissions ${whereSql};`, params),
+    dbPool.query(
+      `
+        SELECT id, firstname, lastname, email, phone_number, comment, email_sent, email_error, created_at
+        FROM form_submissions
+        ${whereSql}
+        ORDER BY created_at DESC
+        OFFSET $${nextParam}
+        LIMIT $${nextParam + 1};
+      `,
+      [...params, offset, safePageSize]
+    ),
+  ]);
+
+  const total = totalResult.rows[0]?.total || 0;
+  const totalPages = Math.max(Math.ceil(total / safePageSize), 1);
+
+  return {
+    records: recordsResult.rows.map(mapSubmissionRow),
+    total,
+    page: safePage,
+    pageSize: safePageSize,
+    limit: safePageSize,
+    totalPages,
+  };
+}
+
+async function getContactEmailHistoryCsvRows(filters = {}) {
+  const { whereSql, params } = buildSubmissionHistoryWhere(filters);
+  const result = await dbPool.query(
+    `
+      SELECT id, firstname, lastname, email, phone_number, comment, email_sent, email_error, created_at
+      FROM form_submissions
+      ${whereSql}
+      ORDER BY created_at DESC;
+    `,
+    params
+  );
+
+  return result.rows.map(mapSubmissionRow);
+}
+
 module.exports = {
   normalizeBody,
   validateSubmission,
@@ -75,4 +163,6 @@ module.exports = {
   createSubmission,
   markEmailSent,
   markEmailFailed,
+  getContactEmailHistoryPage,
+  getContactEmailHistoryCsvRows,
 };
