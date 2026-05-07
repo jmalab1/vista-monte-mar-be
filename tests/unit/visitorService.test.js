@@ -48,13 +48,13 @@ describe('visitorService', () => {
     expect(deriveTrackedPathFromRequest(req)).toBe('/');
   });
 
-  it('gets client ip from x-forwarded-for first value', () => {
+  it('ignores untrusted x-forwarded-for values for client ip', () => {
     const req = {
       headers: { 'x-forwarded-for': '1.2.3.4, 9.8.7.6' },
       ip: '5.5.5.5',
     };
 
-    expect(getClientIp(req)).toBe('1.2.3.4');
+    expect(getClientIp(req)).toBe('5.5.5.5');
   });
 
   it('saves visitor events with normalized path and metadata', async () => {
@@ -74,7 +74,7 @@ describe('visitorService', () => {
 
     expect(id).toBe(42);
     expect(dbPool.query).toHaveBeenCalledTimes(1);
-    expect(dbPool.query.mock.calls[0][1]).toEqual(['/page', 'https://example.com/path', 'agent', '7.7.7.7']);
+    expect(dbPool.query.mock.calls[0][1]).toEqual(['/page', 'https://example.com/path', 'agent', '8.8.8.8']);
   });
 
   it('returns paginated history payload with series', async () => {

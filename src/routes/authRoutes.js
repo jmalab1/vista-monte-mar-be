@@ -8,6 +8,7 @@ const {
   recordFailedAttempt,
   recordSuccessfulAttempt,
   logoutAllForUser,
+  isTokenRevoked,
   logAuthSecurityEvent,
 } = require('../services/securityService');
 const { logAuditEvent } = require('../services/auditService');
@@ -51,6 +52,7 @@ router.get('/api/verify-token', (req, res) => {
   const token = getTokenFromRequest(req);
   const decoded = verifyToken(token);
   if (!decoded) return res.status(401).send({ valid: false });
+  if (isTokenRevoked(decoded)) return res.status(401).send({ valid: false });
 
   const refreshedToken = createToken(decoded.sub);
   const refreshedDecoded = verifyToken(refreshedToken);
